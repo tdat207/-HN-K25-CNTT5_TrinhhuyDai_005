@@ -1,9 +1,6 @@
--- ================================
--- PHẦN 1: DDL – THIẾT KẾ CSDL
--- ================================
 
-CREATE DATABASE warehouse_management;
-USE warehouse_management;
+CREATE DATABASE project;
+USE project;
 
 -- Bảng products
 CREATE TABLE products (
@@ -62,10 +59,8 @@ CREATE TABLE transaction_logs (
     FOREIGN KEY (employee_id) REFERENCES employees(employee_id)
 );
 
--- ================================
--- PHẦN 2: DML
--- ================================
 
+-- PHẦN 2: DML
 -- INSERT products
 INSERT INTO products
 VALUES
@@ -111,10 +106,8 @@ VALUES
 (4, 8002, 5, '2024-05-21 08:10:00', 'Chờ phê duyệt ngoại lệ'),
 (5, 8005, 4, '2024-05-21 09:05:00', 'Hủy do sai mã');
 
--- ================================
--- UPDATE
--- ================================
 
+-- UPDATE
 UPDATE stock_orders so
 JOIN products p
 ON so.product_id = p.product_id
@@ -122,17 +115,12 @@ SET so.quantity = so.quantity * 1.1
 WHERE so.status = 'Completed'
 AND YEAR(p.manufacture_date) < 2000;
 
--- ================================
--- DELETE
--- ================================
 
+-- DELETE
 DELETE FROM transaction_logs
 WHERE log_time < '2024-05-20';
 
--- ================================
 -- PHẦN 3: TRUY VẤN CƠ BẢN
--- ================================
-
 -- Câu 1
 SELECT full_name, role, performance_score
 FROM employees
@@ -151,10 +139,7 @@ FROM stock_orders
 ORDER BY quantity DESC
 LIMIT 2 OFFSET 2;
 
--- ================================
--- PHẦN 4: TRUY VẤN NÂNG CAO
--- ================================
-
+-- TRUY VẤN NÂNG CAO
 -- Câu 1
 SELECT 
     p.product_name,
@@ -187,30 +172,12 @@ WHERE performance_score = (
     FROM employees
 );
 
--- ================================
 -- PHẦN 5: INDEX & VIEW
--- ================================
-
 -- INDEX
 CREATE INDEX idx_status_quantity
 ON stock_orders(status, quantity);
 
--- VIEW
-CREATE VIEW employee_order_summary AS
-SELECT
-    e.full_name,
-    COUNT(so.order_id) AS total_orders,
-    SUM(so.quantity) AS total_quantity
-FROM employees e
-JOIN stock_orders so
-ON e.employee_id = so.employee_id
-WHERE so.status != 'Cancelled'
-GROUP BY e.employee_id, e.full_name;
-
--- ================================
 -- PHẦN 6: TRIGGER
--- ================================
-
 DELIMITER $$
 
 -- Trigger cập nhật Completed
@@ -241,101 +208,7 @@ END $$
 
 DELIMITER ;
 
--- Trigger tăng KPI
-DELIMITER $$
 
-CREATE TRIGGER trg_increase_kpi
-AFTER INSERT ON stock_orders
-FOR EACH ROW
-BEGIN
-    IF NEW.status = 'Completed' THEN
 
-        UPDATE employees
-        SET performance_score =
-            LEAST(performance_score + 0.1, 5.0)
-        WHERE employee_id = NEW.employee_id;
 
-    END IF;
-END $$
 
-DELIMITER ;
-
--- ================================
--- PHẦN 7: STORED PROCEDURE
--- ================================
-
-DELIMITER $$
-
--- Procedure đánh giá năng suất
-CREATE PROCEDURE check_productivity(IN emp_id INT)
-BEGIN
-    DECLARE total_quantity INT;
-
-    SELECT IFNULL(SUM(quantity),0)
-    INTO total_quantity
-    FROM stock_orders
-    WHERE employee_id = emp_id
-    AND status = 'Completed';
-
-    IF total_quantity > 1000 THEN
-        SELECT 'High productivity' AS message;
-
-    ELSEIF total_quantity = 1000 THEN
-        SELECT 'Target met' AS message;
-
-    ELSE
-        SELECT 'Normal' AS message;
-    END IF;
-
-END $$
-
-DELIMITER ;
-
--- Procedure đổi nhân viên phụ trách
-DELIMITER $$
-
-CREATE PROCEDURE reassign_employee(
-    IN p_order_id INT,
-    IN new_employee_id INT
-)
-BEGIN
-
-    DECLARE v_detail_id INT;
-
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-    BEGIN
-        ROLLBACK;
-    END;
-
-    START TRANSACTION;
-
-    UPDATE stock_orders
-    SET employee_id = new_employee_id
-    WHERE order_id = p_order_id;
-
-    SELECT detail_id
-    INTO v_detail_id
-    FROM order_details
-    WHERE order_id = p_order_id
-    LIMIT 1;
-
-    INSERT INTO transaction_logs(
-        log_id,
-        detail_id,
-        employee_id,
-        log_time,
-        note
-    )
-    VALUES(
-        (SELECT IFNULL(MAX(log_id),0) + 1 FROM transaction_logs),
-        v_detail_id,
-        new_employee_id,
-        NOW(),
-        'Employee reassigned'
-    );
-
-    COMMIT;
-
-END $$
-
-DELIMITER ;
