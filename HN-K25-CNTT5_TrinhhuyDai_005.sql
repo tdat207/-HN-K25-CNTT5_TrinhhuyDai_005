@@ -29,7 +29,6 @@ CREATE TABLE stock_orders (
     order_time DATETIME NOT NULL,
     quantity INT CHECK (quantity > 0),
     status ENUM('Pending', 'Completed', 'Cancelled'),
-
     FOREIGN KEY (product_id) REFERENCES products(product_id),
     FOREIGN KEY (employee_id) REFERENCES employees(employee_id)
 );
@@ -42,7 +41,6 @@ CREATE TABLE order_details (
     condition_check VARCHAR(255) NOT NULL,
     handling_method TEXT,
     detail_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-
     FOREIGN KEY (order_id) REFERENCES stock_orders(order_id)
 );
 
@@ -53,7 +51,6 @@ CREATE TABLE transaction_logs (
     employee_id INT,
     log_time DATETIME NOT NULL,
     note TEXT,
-
     FOREIGN KEY (detail_id) REFERENCES order_details(detail_id),
     FOREIGN KEY (employee_id) REFERENCES employees(employee_id)
 );
@@ -186,7 +183,6 @@ FOR EACH ROW
 BEGIN
     IF NEW.status = 'Completed'
     AND OLD.status != 'Completed' THEN
-
         INSERT INTO transaction_logs (
             log_id,
             detail_id,
@@ -201,10 +197,8 @@ BEGIN
             NOW(),
             'Order completed'
         );
-
     END IF;
 END $$
-
 DELIMITER ;
 
 
